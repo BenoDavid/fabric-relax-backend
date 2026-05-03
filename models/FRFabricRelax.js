@@ -9,6 +9,16 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: 'id',
         as: 'fabric'
       }); 
+      FRFabricRelax.hasOne(models.FRIssue, {
+        sourceKey: 'id',
+        foreignKey: 'rollId',
+        as: 'issuefabric'
+      }); 
+        FRFabricRelax.hasOne(models.FRTrolleyAllocation, {
+        sourceKey: 'id',
+        foreignKey: 'rollId',
+        as: 'trolleyAllocation'
+      }); 
     }
   }
 

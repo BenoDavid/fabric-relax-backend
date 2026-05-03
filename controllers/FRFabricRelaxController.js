@@ -130,6 +130,14 @@ class FRFabricRelaxController extends BaseController {
          include: [{
               model: this.model.associations.fabric.target,
               as: 'fabric',
+            },
+          {
+              model: this.model.associations.issuefabric.target,
+              as: 'issuefabric',
+            },
+            {
+              model: this.model.associations.trolleyAllocation.target,
+              as: 'trolleyAllocation',
             }]
         // order: sortOptions,
         // ...paginationOptions
