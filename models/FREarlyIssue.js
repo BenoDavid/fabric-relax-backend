@@ -11,13 +11,11 @@ module.exports = (sequelize, DataTypes) => {
       requestedBy : DataTypes.STRING,
       approvedOn : DataTypes.DATE,
       approvedBy : DataTypes.STRING,
-      createdAt: DataTypes.DATE,
-      updatedAt: DataTypes.DATE
   }, {
     sequelize,
     modelName: 'FREarlyIssue',
     tableName: 'FREarlyIssues',
-    timestamps: true,
+    timestamps: false,
   });
 
   return FREarlyIssue;

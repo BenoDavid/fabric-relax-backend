@@ -11,8 +11,6 @@ module.exports = (sequelize, DataTypes) => {
       location : DataTypes.STRING ,
       maxCapacity : DataTypes.INTEGER ,
       status : DataTypes.STRING ,
-      allocatedBy : DataTypes.STRING ,
-      allocatedAt : DataTypes.DATE
   }, {
     sequelize,
     modelName: 'FRPallet',

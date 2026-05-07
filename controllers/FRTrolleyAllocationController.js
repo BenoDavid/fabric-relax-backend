@@ -22,7 +22,7 @@ class FRTrolleyAllocationController extends BaseController {
    */
 
   async create(req, res) {
-    const { type, rollId, trolleyCode, rackNo, allocatedBy, buyerName } = req.body;
+    const { type, rollId, trolleyCode, rackNo, allocatedBy, buyerName,palletCode } = req.body;
 
     // ✅ Normalize rack
     // let rackNo = null;
@@ -101,7 +101,7 @@ class FRTrolleyAllocationController extends BaseController {
           await trolley.save({ transaction });
 
           // ✅ Update roll status
-          roll.status = "Trolley Allocated";
+          roll.status = "trolley_allocated";
           roll.trolleyCode = trolleyCode;
           await roll.save({ transaction });
         }
@@ -157,7 +157,8 @@ class FRTrolleyAllocationController extends BaseController {
           await pallet.save({ transaction });
 
           // ✅ Update roll status
-          roll.status = "PALLET_ALLOCATED";
+          roll.status = "pallet_allocated";
+          roll.trolleyCode = palletCode;
           await roll.save({ transaction });
         } else {
           throw new Error("Invalid allocation type");

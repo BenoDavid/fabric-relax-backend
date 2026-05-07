@@ -14,7 +14,7 @@ module.exports = (sequelize, DataTypes) => {
     sequelize,
     modelName: 'FRPalletAllocation',
     tableName: 'FRPalletAllocations',
-    timestamps: true,
+    timestamps: false,
   });
 
   return FRPalletAllocation;

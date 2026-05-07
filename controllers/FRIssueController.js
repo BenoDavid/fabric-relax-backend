@@ -1,7 +1,8 @@
 "use strict";
 const db = require("../models");
 const BaseController = require("./BaseController");
-
+const { getWss } = require("../ws");
+const wss = getWss();
 const {
   FRIssue,
   FRFabricRelax,
@@ -58,14 +59,22 @@ class FRIssueController extends BaseController {
               );
         // ✅ Update roll table
         await FRFabricRelax.update(
-          { status: "ISSUED TO CUTTING" },
+          { status: "issued_to_cutting" },
           {
             where: { id: rollIds },
             transaction,
           },
         );
       });
-
+       
+      if (wss) {
+        wss.broadcast({
+          event: "MovedToCuttingRoll",
+          data: {
+            addRoll:1
+          },
+        });
+      }
       return res.json({
         success: true,
         message: "Rolls issued to cutting successfully",
@@ -101,7 +110,7 @@ class FRIssueController extends BaseController {
           }
 
           await FRFabricRelax.update(
-            { status: "APPROVED" },
+            { status: "APPROVED", isActive: false },
             { where: { id: rollIds }, transaction },
           );
 
@@ -149,10 +158,19 @@ class FRIssueController extends BaseController {
                 },
               );
             }
+
+              if (wss) {
+                wss.broadcast({
+                  event: "CuttingApprovedRoll",
+                  data: {
+                    addRoll:1
+                  },
+                });
+              }
           }
         } else if (type === "RETURN") {
           await FRFabricRelax.update(
-            { status: "RETURNED TO RELAXATION" },
+            { status: "returned_to_relaxation" },
             { where: { id: rollIds }, transaction },
           );
 
@@ -164,6 +182,15 @@ class FRIssueController extends BaseController {
             },
             { where: { rollId: rollIds }, transaction },
           );
+            if (wss) {
+                wss.broadcast({
+                  event: "CuttingRejectedRoll",
+                  data: {
+                    addRoll:1
+                  },
+                });
+              }
+          
         }
       });
 

@@ -1,10 +1,10 @@
-'use strict';
-const { TIME } = require('sequelize');
-const db = require('../models');
-const BaseController = require('./BaseController');
-const { FRFabricRelax ,WMSFabricCollection} = db.sequelizeDb2.models;
-const { Sequelize } = require('sequelize');
-
+"use strict";
+const { TIME, where } = require("sequelize");
+const db = require("../models");
+const BaseController = require("./BaseController");
+const { FRFabricRelax, WMSFabricCollection } = db.sequelizeDb2.models;
+const { Sequelize } = require("sequelize");
+const { getWss } = require("../ws");
 /**
  * Controller for handling Product Development, Compliance, and Bulk tracking.
  * Extends a BaseController for standard CRUD functionality.
@@ -14,35 +14,34 @@ class FRFabricRelaxController extends BaseController {
     // Pass the FRFabricRelax model to the BaseController constructor
     super(FRFabricRelax);
   }
- async create(req, res) {
+  async create(req, res) {
     try {
-
       const fab = await WMSFabricCollection.findOne({
         where: {
-             shadeLot: req.body.shadeLot,
-             ocNo: req.body.ocNo,
-             invoiceNo: req.body.invoiceNo,
-        }
+          shadeLot: req.body.shadeLot,
+          ocNo: req.body.ocNo,
+          invoiceNo: req.body.invoiceNo,
+        },
       });
 
       if (!fab) {
         return res.status(404).json({
           status: 404,
-          message: 'Fabric not found',
-          result: null
+          message: "Fabric not found",
+          result: null,
         });
       }
       const roll = await FRFabricRelax.findOne({
         where: {
           rollId: fab?.id,
-        }
+        },
       });
 
       if (roll) {
         return res.status(404).json({
           status: 404,
-          message: 'Roll already exists in relaxation process',
-          result: null
+          message: "Roll already exists in relaxation process",
+          result: null,
         });
       }
 
@@ -52,37 +51,60 @@ class FRFabricRelaxController extends BaseController {
         machineStart: Date.now(),
         facility: req.body.facility,
         fabricContent: req.body.fabricContent,
-        status: 'Relaxation Processing',
+        status: "Relaxation_Processing",
         relaxingHours: req.body.relaxingHour,
         buyerName: req.body.buyerName,
         uom: req.body.uom,
-        machineLoadBy: req.body.machineLoadBy
+        machineLoadBy: req.body.machineLoadBy,
       });
+
+      const wss = getWss();
+      if (wss) {
+        wss.broadcast({
+          event: "loadRoll",
+          data: {
+            addRoll:1
+          },
+        });
+      }
+
       res.status(200).json({
         status: 200,
         message: `${this.model.name} created successfully`,
         result: {
           createdItem: item,
-          fabricDetails: fab
-        }
+          fabricDetails: fab,
+        },
       });
     } catch (error) {
       res.status(500).json({
         status: 500,
         message: error.message,
-        result: {}
+        result: {},
       });
     }
   }
- async getAll(req, res) {
+  async getAll(req, res) {
     try {
       // Extract query parameters for pagination, filtering, and sorting
-      const { fromDate, toDate, page = 1, limit = 10, search,
-        searchField, sortBy = 'createdAt', sortOrder = 'DESC', ...filters } = req.query;
+      const {
+        fromDate,
+        toDate,
+        page = 1,
+        limit = 10,
+        search,
+        searchField,
+        sortBy = "createdAt",
+        sortOrder = "DESC",
+        ...filters
+      } = req.query;
 
       // Set up pagination
       const offset = (page - 1) * limit;
-      const paginationOptions = { offset: parseInt(offset), limit: parseInt(limit) };
+      const paginationOptions = {
+        offset: parseInt(offset),
+        limit: parseInt(limit),
+      };
 
       // Set up sorting
       const sortOptions = [[sortBy, sortOrder.toUpperCase()]];
@@ -96,7 +118,7 @@ class FRFabricRelaxController extends BaseController {
       // 🔍 Dynamic field search
       if (search && searchField) {
         filterOptions[searchField] = {
-          [Sequelize.Op.like]: `%${search}%`
+          [Sequelize.Op.like]: `%${search}%`,
         };
       }
 
@@ -106,7 +128,7 @@ class FRFabricRelaxController extends BaseController {
 
         for (const attribute of Object.keys(this.model.rawAttributes)) {
           searchConditions.push({
-            [attribute]: { [Sequelize.Op.like]: `%${search}%` }
+            [attribute]: { [Sequelize.Op.like]: `%${search}%` },
           });
         }
 
@@ -124,21 +146,40 @@ class FRFabricRelaxController extends BaseController {
           [Sequelize.Op.between]: [startDate, endDate],
         };
       }
+      const fabricWhere = {};
+      if (filterOptions.shadeLot) fabricWhere.shadeLot = filterOptions.shadeLot;
+      if (filterOptions.ocNo) fabricWhere.ocNo = filterOptions.ocNo;
+      if (filterOptions.poNo) fabricWhere.poNo = filterOptions.poNo;
+      if (filterOptions.fabricRef)
+        fabricWhere.fabricRef = filterOptions.fabricRef;
+
       // Combine all options and fetch data
+      const whereOptions = {};
+      if (filterOptions.createdAt)
+        whereOptions.createdAt = filterOptions.createdAt;
+      if (filterOptions.status) whereOptions.status = filterOptions.status;
+      if (filterOptions.trolleyCode) whereOptions.trolleyCode = filterOptions.trolleyCode;
+
+      // for (const key in filterOptions) {
+      //   whereOptions[key] = filterOptions[key];
+      // }
       const items = await this.model.findAndCountAll({
-        where: filterOptions,
-         include: [{
-              model: this.model.associations.fabric.target,
-              as: 'fabric',
-            },
+        where: whereOptions,
+        include: [
           {
-              model: this.model.associations.issuefabric.target,
-              as: 'issuefabric',
-            },
-            {
-              model: this.model.associations.trolleyAllocation.target,
-              as: 'trolleyAllocation',
-            }]
+            model: this.model.associations.fabric.target,
+            as: "fabric",
+            ...(Object.keys(fabricWhere).length && { where: fabricWhere }),
+          },
+          {
+            model: this.model.associations.issuefabric.target,
+            as: "issuefabric",
+          },
+          {
+            model: this.model.associations.trolleyAllocation.target,
+            as: "trolleyAllocation",
+          },
+        ],
         // order: sortOptions,
         // ...paginationOptions
       });
@@ -152,14 +193,108 @@ class FRFabricRelaxController extends BaseController {
           totalItems: items.count,
           totalPages: Math.ceil(items.count / limit),
           currentPage: parseInt(page),
-          pageSize: parseInt(limit)
-        }
+          pageSize: parseInt(limit),
+        },
       });
     } catch (error) {
       res.status(500).json({
         status: 500,
         message: error.message,
         result: [],
+      });
+    }
+  }
+  async getAllByCustomKey(req, res) {
+    
+    try {
+      const filters = req.body || {};
+
+      const items = await this.model.findAll({
+        where: filters,
+      });
+
+      const now = new Date().getTime();
+
+      // ✅ Helper function
+      const isCompleted = (row) => {
+        if (!row.machineEnd || !row.relaxingHours) return false;
+
+        const totalTime =
+          new Date(row.machineEnd).getTime() +
+          row.relaxingHours * 60 * 60 * 1000;
+
+        return totalTime <= now;
+      };
+
+      // ✅ ✅ COUNTS
+      const counts = {
+        loadRoll: items.filter((r) => r.machineEnd == null).length,
+
+        loadedRoll: items.filter(
+          (r) => r.machineEnd != null && r.status === "relaxation_started",
+        ).length,
+
+        trolleyAllocated: items.filter(
+          (r) =>
+            r.machineEnd != null &&
+            (r.status === "trolley_allocated" ||
+              r.status === "returned_to_relaxation"),
+        ).length,
+
+        relaxationCompleted: items.filter((r) => isCompleted(r)).length,
+
+        overRelaxed: items.filter(
+          (r) => isCompleted(r) && r.status === "trolley_allocated",
+        ).length,
+
+        issuedToCutting: items.filter((r) => r.status === "issued_to_cutting")
+          .length,
+
+        approved: items.filter((r) => r.status === "APPROVED").length,
+
+        returned: items.filter((r) => r.status === "returned_to_relaxation").length,
+      };
+
+      return res.status(200).json({
+        status: 200,
+        message: `${this.model.name} fetched successfully`,
+        result: counts,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        status: 500,
+        message: error.message,
+        result: {},
+      });
+    }
+  }
+  async update(req, res) {
+    try {
+      const [updated] = await this.model.update(req.body, {
+        where: { id: req.params.id }
+      });
+      if (updated) {
+        const item = await this.model.findByPk(req.params.id);
+        res.status(200).json({
+          status: 200,
+          message: `${this.model.name}s updated successfully`,
+          result: item,
+        });
+      const wss = getWss();
+      if (wss) {
+        wss.broadcast({
+          event: "loadedRoll",
+          data: {
+            addRoll:1
+          },
+        });
+      }
+      }
+    } catch (error) {
+      res.status(500).json({
+        status: 500,
+        message: error.message,
+        result: {},
       });
     }
   }
