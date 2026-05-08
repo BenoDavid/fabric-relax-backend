@@ -63,7 +63,7 @@ class FRFabricRelaxController extends BaseController {
         wss.broadcast({
           event: "loadRoll",
           data: {
-            addRoll:1
+            addRoll: 1,
           },
         });
       }
@@ -158,7 +158,8 @@ class FRFabricRelaxController extends BaseController {
       if (filterOptions.createdAt)
         whereOptions.createdAt = filterOptions.createdAt;
       if (filterOptions.status) whereOptions.status = filterOptions.status;
-      if (filterOptions.trolleyCode) whereOptions.trolleyCode = filterOptions.trolleyCode;
+      if (filterOptions.trolleyCode)
+        whereOptions.trolleyCode = filterOptions.trolleyCode;
 
       // for (const key in filterOptions) {
       //   whereOptions[key] = filterOptions[key];
@@ -178,6 +179,12 @@ class FRFabricRelaxController extends BaseController {
           {
             model: this.model.associations.trolleyAllocation.target,
             as: "trolleyAllocation",
+          },
+          {
+            model: this.model.associations.earlyIssue.target,
+            as: "earlyIssue", // ✅ must match alias
+            attributes: ["rollId", "status", "requestedOn", "approvedOn"],
+            required: false,
           },
         ],
         // order: sortOptions,
@@ -205,7 +212,6 @@ class FRFabricRelaxController extends BaseController {
     }
   }
   async getAllByCustomKey(req, res) {
-    
     try {
       const filters = req.body || {};
 
@@ -252,7 +258,8 @@ class FRFabricRelaxController extends BaseController {
 
         approved: items.filter((r) => r.status === "APPROVED").length,
 
-        returned: items.filter((r) => r.status === "returned_to_relaxation").length,
+        returned: items.filter((r) => r.status === "returned_to_relaxation")
+          .length,
       };
 
       return res.status(200).json({
@@ -271,7 +278,7 @@ class FRFabricRelaxController extends BaseController {
   async update(req, res) {
     try {
       const [updated] = await this.model.update(req.body, {
-        where: { id: req.params.id }
+        where: { id: req.params.id },
       });
       if (updated) {
         const item = await this.model.findByPk(req.params.id);
@@ -280,15 +287,15 @@ class FRFabricRelaxController extends BaseController {
           message: `${this.model.name}s updated successfully`,
           result: item,
         });
-      const wss = getWss();
-      if (wss) {
-        wss.broadcast({
-          event: "loadedRoll",
-          data: {
-            addRoll:1
-          },
-        });
-      }
+        const wss = getWss();
+        if (wss) {
+          wss.broadcast({
+            event: "loadedRoll",
+            data: {
+              addRoll: 1,
+            },
+          });
+        }
       }
     } catch (error) {
       res.status(500).json({
