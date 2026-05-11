@@ -1,3 +1,4 @@
+
 "use strict";
 
 const db = require("../models");
@@ -17,18 +18,16 @@ class FRTrolleyAllocationController extends BaseController {
     super(FRTrolleyAllocation);
   }
 
-  /**
-   * Allocate roll to trolley rack
-   */
-
   async create(req, res) {
-    const { type, rollId, trolleyCode, rackNo, allocatedBy, buyerName,palletCode } = req.body;
-
-    // ✅ Normalize rack
-    // let rackNo = null;
-    // if (req.body.rackNo) {
-    //   rackNo = Number(String(req.body.rackNo).replace("R", ""));
-    // }
+    const {
+      type,
+      rollId,
+      trolleyCode,
+      rackNo,
+      allocatedBy,
+      buyerName,
+      palletCode,
+    } = req.body;
 
     try {
       await db.sequelizeDb2.transaction(async (transaction) => {
@@ -67,40 +66,60 @@ class FRTrolleyAllocationController extends BaseController {
             throw new Error("Buyer mismatch – trolley locked");
           }
 
-          // ✅ Prevent duplicate
-          const exists = await FRTrolleyAllocation.findOne({
+          // ✅ REMOVE FROM OLD TROLLEY (Trolley → Trolley move)
+          const existingTrolley = await FRTrolleyAllocation.findOne({
             where: { rollId },
             transaction,
           });
 
-          if (exists) throw new Error("Roll already allocated");
+          if (existingTrolley) {
+            // free old rack
+            await FRTrolleyRack.update(
+              { isOccupied: false },
+              {
+                where: {
+                  trolleyId: existingTrolley.trolleyId,
+                  rackNo: existingTrolley.rackNo,
+                },
+                transaction,
+              }
+            );
 
-          // ✅ Insert allocation
+            await existingTrolley.destroy({ transaction });
+          }
+
+          // ✅ REMOVE FROM PALLET (Pallet → Trolley)
+          await FRPalletAllocation.destroy({
+            where: { rollId },
+            transaction,
+          });
+
+          // ✅ CREATE NEW ALLOCATION
           await FRTrolleyAllocation.create({
             trolleyId: trolley.id,
             rackNo,
             rollId,
-            buyerName: buyerName, 
+            buyerName,
             allocatedBy,
-            allocatedAt: new Date()
+            allocatedAt: new Date(),
           }, { transaction });
 
-
-          // ✅ Update rack
+          // ✅ UPDATE RACK
           rack.isOccupied = true;
           await rack.save({ transaction });
 
-          // ✅ Update trolley status
+          // ✅ UPDATE TROLLEY STATUS
           const count = await FRTrolleyRack.count({
             where: { trolleyId: trolley.id, isOccupied: true },
             transaction,
           });
 
-          trolley.status = count >= trolley.capacity ? "FULL" : "PARTIAL";
+          trolley.status =
+            count >= trolley.capacity ? "FULL" : "PARTIAL";
 
           await trolley.save({ transaction });
 
-          // ✅ Update roll status
+          // ✅ UPDATE ROLL
           roll.status = "trolley_allocated";
           roll.trolleyCode = trolleyCode;
           await roll.save({ transaction });
@@ -118,57 +137,71 @@ class FRTrolleyAllocationController extends BaseController {
 
           if (!pallet) throw new Error("Pallet not found");
 
-          // // ✅ Buyer lock
-          // if (!pallet.buyerName) {
-          //   pallet.buyerName = roll.buyerName;
-          //   await pallet.save({ transaction });
-          // } else if (pallet.buyerName !== roll.buyerName) {
-          //   throw new Error("Buyer mismatch – pallet locked");
-          // }
-
-          // ✅ Prevent duplicate
-          const exists = await FRPalletAllocation.findOne({
+          // ✅ REMOVE FROM TROLLEY (Trolley → Pallet)
+          const existingTrolley = await FRTrolleyAllocation.findOne({
             where: { rollId },
             transaction,
           });
 
-          if (exists) throw new Error("Roll already allocated");
+          if (existingTrolley) {
 
-          // ✅ Insert allocation
-          await FRPalletAllocation.create(
-            {
-              palletId: pallet.id,
-              rollId,
-              buyerName: roll.buyerName,
-              allocatedBy,
-              allocatedAt: new Date(),
-            },
-            { transaction },
-          );
+            await FRTrolleyRack.update(
+              { isOccupied: false },
+              {
+                where: {
+                  trolleyId: existingTrolley.trolleyId,
+                  rackNo: existingTrolley.rackNo,
+                },
+                transaction,
+              }
+            );
 
-          // ✅ Update pallet status
+            await existingTrolley.destroy({ transaction });
+          }
+
+          // ✅ REMOVE FROM OLD PALLET (Pallet → Pallet move)
+          await FRPalletAllocation.destroy({
+            where: { rollId },
+            transaction,
+          });
+
+          // ✅ CREATE NEW PALLET ALLOCATION
+          await FRPalletAllocation.create({
+            palletId: pallet.id,
+            rollId,
+            buyerName: roll.buyerName,
+            allocatedBy,
+            allocatedAt: new Date(),
+          }, { transaction });
+
+          // ✅ UPDATE PALLET STATUS
           const count = await FRPalletAllocation.count({
             where: { palletId: pallet.id },
             transaction,
           });
 
-          pallet.status = count >= pallet.maxCapacity ? "FULL" : "PARTIAL";
+          pallet.status =
+            count >= pallet.maxCapacity ? "FULL" : "PARTIAL";
 
           await pallet.save({ transaction });
 
-          // ✅ Update roll status
+          // ✅ UPDATE ROLL
           roll.status = "pallet_allocated";
           roll.trolleyCode = palletCode;
           await roll.save({ transaction });
-        } else {
+        }
+
+        else {
           throw new Error("Invalid allocation type");
         }
+
       });
 
       return res.json({
         success: true,
         message: `${type} allocation successful`,
       });
+
     } catch (error) {
       return res.status(400).json({
         success: false,

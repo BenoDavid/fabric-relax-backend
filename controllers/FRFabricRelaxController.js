@@ -51,7 +51,7 @@ class FRFabricRelaxController extends BaseController {
         machineStart: Date.now(),
         facility: req.body.facility,
         fabricContent: req.body.fabricContent,
-        status: "Relaxation_Processing",
+        status: "relaxation_processing",
         relaxingHours: req.body.relaxingHour,
         buyerName: req.body.buyerName,
         uom: req.body.uom,
