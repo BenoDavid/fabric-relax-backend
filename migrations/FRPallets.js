@@ -38,6 +38,14 @@ module.exports = {
     status: {
       type: Sequelize.STRING   // EMPTY | PARTIAL | FULL
     },
+    
+    currentLocation: {
+      type: DataTypes.STRING,
+    },
+    
+    isActive: {
+      type: DataTypes.BOOLEAN, defaultValue: true,
+    },
 
     createdAt: {
       allowNull: false,

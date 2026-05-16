@@ -2,7 +2,7 @@
 const { TIME, where } = require("sequelize");
 const db = require("../models");
 const BaseController = require("./BaseController");
-const { FRFabricRelax, WMSFabricCollection } = db.sequelizeDb2.models;
+const { FRFabricRelax, WMSFabricCollection, FRTrolleyAllocation, FRTrolleyRack, FRTrolley } = db.sequelizeDb2.models;
 const { Sequelize } = require("sequelize");
 const { getWss } = require("../ws");
 /**
@@ -305,6 +305,143 @@ class FRFabricRelaxController extends BaseController {
       });
     }
   }
+async updateBatch(req, res) {
+  try {
+
+    const { ids, data } = req.body;
+
+    if (!ids || ids.length === 0) {
+      return res.status(400).json({
+        status: 400,
+        message: "No IDs provided",
+        result: []
+      });
+    }
+
+    await db.sequelizeDb2.transaction(async (transaction) => {
+
+      // ✅ 1. Update main table
+      const [updated] = await this.model.update(data, {
+        where: {
+          id: {
+            [db.Sequelize.Op.in]: ids
+          }
+        },
+        transaction
+      });
+
+      if (!updated) {
+        throw new Error("No records found to update");
+      }
+
+      // ✅ 2. Get updated items
+      const updatedItems = await this.model.findAll({
+        where: {
+          id: {
+            [db.Sequelize.Op.in]: ids
+          }
+        },
+        transaction
+      });
+
+      // ✅ 3. Get trolley allocations
+      const allocations = await FRTrolleyAllocation.findAll({
+        where: {
+          rollId: {
+            [db.Sequelize.Op.in]: ids   
+          }
+        },
+        transaction
+      });
+
+      // ✅ 4. Free racks
+      if (allocations.length > 0) {
+
+        await FRTrolleyRack.update(
+          { isOccupied: false },
+          {
+            where: {
+              [db.Sequelize.Op.or]: allocations.map((a) => ({
+                trolleyId: a.trolleyId,
+                rackNo: a.rackNo,
+              })),
+            },
+            transaction
+          }
+        );
+
+        // ✅ 5. Delete allocations (IMPORTANT)
+        // await FRTrolleyAllocation.destroy({
+        //   where: {
+        //     rollId: {
+        //       [db.Sequelize.Op.in]: ids
+        //     }
+        //   },
+        //   transaction
+        // });
+
+        // ✅ 6. Reset trolley if empty
+        const trolleyIds = [...new Set(allocations.map(a => a.trolleyId))];
+
+        for (const trolleyId of trolleyIds) {
+
+          const remaining = await FRTrolleyRack.count({
+            where: {
+              trolleyId,
+              isOccupied: true
+            },
+            transaction
+          });
+
+
+          if (remaining === 0) {
+            await FRTrolley.update(
+              {
+                buyerName: null,
+                location: null,
+                status: "EMPTY",
+                currentLocation: 'relaxation'
+              },
+              {
+                where: { id: trolleyId },
+                transaction
+              }
+            );
+          }
+        }
+      }
+
+      // ✅ 7. WebSocket broadcast
+      const wss = getWss();
+      if (wss) {
+        wss.broadcast({
+          event: "ReturnedRoll",
+          data: {
+            addRoll: ids.length,
+          },
+        });
+      }
+
+      // ✅ 8. Response
+      return res.status(200).json({
+        status: 200,
+        message: `${this.model.name}s updated successfully`,
+        result: updatedItems
+      });
+
+    });
+
+  } catch (error) {
+
+    return res.status(500).json({
+      status: 500,
+      message: error.message,
+      result: []
+    });
+
+  }
+}
+
 }
 
 module.exports = new FRFabricRelaxController();

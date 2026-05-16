@@ -20,6 +20,8 @@ module.exports = (sequelize, DataTypes) => {
       location : DataTypes.STRING,
       capacity : DataTypes.INTEGER,
       status: DataTypes.STRING,
+      currentLocation: DataTypes.STRING,
+      isActive: DataTypes.BOOLEAN,
       createdAt: DataTypes.DATE,
       updatedAt: DataTypes.DATE
   }, {

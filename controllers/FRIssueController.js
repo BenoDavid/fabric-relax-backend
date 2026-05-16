@@ -51,6 +51,7 @@ class FRIssueController extends BaseController {
            await FRTrolley.update(
                 {
                   location: null,
+                  currentLocation: "cutting",
                 },
                 {
                   where: { trolleyId: trolleyCode },
@@ -151,6 +152,7 @@ class FRIssueController extends BaseController {
                   buyerName: null,
                   location: null,
                   status: "EMPTY",
+                  currentLocation: "relaxation",
                 },
                 {
                   where: { id: trolleyId },
@@ -169,6 +171,15 @@ class FRIssueController extends BaseController {
               }
           }
         } else if (type === "RETURN") {
+          const allocations = await FRTrolleyAllocation.findAll({
+            where: { rollId: rollIds },
+            transaction,
+          });
+
+          if (!allocations.length) {
+            throw new Error("No Rolls found");
+          }
+
           await FRFabricRelax.update(
             { status: "returned_to_relaxation" },
             { where: { id: rollIds }, transaction },
@@ -182,6 +193,27 @@ class FRIssueController extends BaseController {
             },
             { where: { rollId: rollIds }, transaction },
           );
+
+            const trolleyIds = [...new Set(allocations.map((a) => a.trolleyId))];
+
+          for (const trolleyId of trolleyIds) {
+            const remaining = await FRTrolleyRack.count({
+              where: { trolleyId, isOccupied: true },
+              transaction,
+            });
+
+            if (remaining === 0) {
+              await FRTrolley.update(
+                {
+                  currentLocation: "returned_to_relaxation",
+                },
+                {
+                  where: { id: trolleyId },
+                  transaction,
+                },
+              );
+            }
+          }
             if (wss) {
                 wss.broadcast({
                   event: "CuttingRejectedRoll",

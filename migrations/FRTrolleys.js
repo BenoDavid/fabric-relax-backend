@@ -38,7 +38,13 @@ module.exports = {
       status: {
         type: Sequelize.STRING, // EMPTY | PARTIAL | FULL
       },
-
+      currentLocation: {
+      type: DataTypes.STRING,
+      },
+    
+    isActive: {
+      type: DataTypes.BOOLEAN, defaultValue: true,
+    },
       createdAt: Sequelize.DATE,
       updatedAt: Sequelize.DATE,
     });

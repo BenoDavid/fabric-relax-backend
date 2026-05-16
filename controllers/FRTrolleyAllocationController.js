@@ -169,7 +169,7 @@ class FRTrolleyAllocationController extends BaseController {
           await FRPalletAllocation.create({
             palletId: pallet.id,
             rollId,
-            buyerName: roll.buyerName,
+            buyerName,
             allocatedBy,
             allocatedAt: new Date(),
           }, { transaction });
@@ -197,15 +197,17 @@ class FRTrolleyAllocationController extends BaseController {
 
       });
 
-      return res.json({
-        success: true,
+      res.status(200).json({
+        status: 200,
         message: `${type} allocation successful`,
+        result: type === "TROLLEY" ? trolleyCode : palletCode,
       });
 
     } catch (error) {
       return res.status(400).json({
-        success: false,
+        status: 400,
         message: error.message,
+        result: {},
       });
     }
   }
