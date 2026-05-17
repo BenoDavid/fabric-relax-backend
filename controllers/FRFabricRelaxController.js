@@ -34,6 +34,7 @@ class FRFabricRelaxController extends BaseController {
       const roll = await FRFabricRelax.findOne({
         where: {
           rollId: fab?.id,
+          isActive: true,
         },
       });
 
@@ -157,7 +158,17 @@ class FRFabricRelaxController extends BaseController {
       const whereOptions = {};
       if (filterOptions.createdAt)
         whereOptions.createdAt = filterOptions.createdAt;
-      if (filterOptions.status) whereOptions.status = filterOptions.status;
+  
+      if (filterOptions.status) {
+        if (typeof filterOptions.status === "string" && filterOptions.status.includes(",")) {
+          whereOptions.status = {
+            [Sequelize.Op.in]: filterOptions.status.split(","),
+          };
+        } else {
+          whereOptions.status = filterOptions.status;
+        }
+      }
+
       if (filterOptions.trolleyCode)
         whereOptions.trolleyCode = filterOptions.trolleyCode;
 
