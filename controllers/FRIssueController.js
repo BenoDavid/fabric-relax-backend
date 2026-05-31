@@ -72,7 +72,7 @@ class FRIssueController extends BaseController {
         wss.broadcast({
           event: "MovedToCuttingRoll",
           data: {
-            addRoll:1
+            addRoll:rolls.length
           },
         });
       }
@@ -165,7 +165,7 @@ class FRIssueController extends BaseController {
                 wss.broadcast({
                   event: "CuttingApprovedRoll",
                   data: {
-                    addRoll:1
+                    addRoll:rollIds.length
                   },
                 });
               }
@@ -218,7 +218,7 @@ class FRIssueController extends BaseController {
                 wss.broadcast({
                   event: "CuttingRejectedRoll",
                   data: {
-                    addRoll:1
+                    addRoll:rollIds.length
                   },
                 });
               }

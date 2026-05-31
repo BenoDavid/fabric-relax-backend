@@ -166,6 +166,45 @@ class FRFabricRelaxController extends BaseController {
           };
         } else {
           whereOptions.status = filterOptions.status;
+          if (filterOptions.status === "over_relaxed") {
+
+            // ✅ ONLY calculated condition
+            whereOptions.status = {
+              [Sequelize.Op.in]: [
+                "relaxation_processing",
+                "trolley_allocated",
+                "pallet_allocated"
+              ]
+            };
+
+            whereOptions.machineEnd = {
+              [Sequelize.Op.ne]: null
+            };
+
+            whereOptions.relaxingHours = {
+              [Sequelize.Op.ne]: null
+            };
+
+
+            whereOptions[Sequelize.Op.and] = Sequelize.where(
+              Sequelize.literal("DATEADD(HOUR, relaxingHours, machineEnd)"),
+              "<=",
+              Sequelize.literal("GETDATE()")
+            );
+            
+
+          }else if (filterOptions.status === "early_issued") {
+             whereOptions.status = {
+              [Sequelize.Op.in]: [
+                "trolley_allocated",
+                "issued_to_cutting",
+                "Approved",
+                "returned_to_relaxation"
+              ]
+            };
+          }else{
+            whereOptions.status = filterOptions.status;
+          }
         }
       }
 
@@ -195,8 +234,16 @@ class FRFabricRelaxController extends BaseController {
             model: this.model.associations.earlyIssue.target,
             as: "earlyIssue", // ✅ must match alias
             attributes: ["rollId", "status", "requestedOn", "approvedOn"],
-            required: false,
+            
+            required: filterOptions.status == "early_issued",
+
+            where:
+              filterOptions.status == "early_issued"
+                ? { status: "APPROVED" }
+                : undefined,
+
           },
+          
         ],
         // order: sortOptions,
         // ...paginationOptions
@@ -426,7 +473,7 @@ async updateBatch(req, res) {
       const wss = getWss();
       if (wss) {
         wss.broadcast({
-          event: "ReturnedRoll",
+          event: "CuttingRejectedRoll",
           data: {
             addRoll: ids.length,
           },
