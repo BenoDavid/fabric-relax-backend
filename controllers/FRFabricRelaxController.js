@@ -202,13 +202,24 @@ class FRFabricRelaxController extends BaseController {
                 "returned_to_relaxation"
               ]
             };
-          }else{
+          }
+          
+          else if (filterOptions.status === "issued_to_cutting") {
+            if (filterOptions.trolleyCode) {
+              whereOptions.trolleyCode = filterOptions.trolleyCode;
+            } else {
+              whereOptions.trolleyCode = {
+                [Sequelize.Op.is]: null,
+              };
+            }
+          }
+          else{
             whereOptions.status = filterOptions.status;
           }
         }
       }
 
-      if (filterOptions.trolleyCode)
+      if (filterOptions.trolleyCode && filterOptions.status !== "issued_to_cutting")
         whereOptions.trolleyCode = filterOptions.trolleyCode;
 
       // for (const key in filterOptions) {
@@ -318,6 +329,11 @@ class FRFabricRelaxController extends BaseController {
 
         returned: items.filter((r) => r.status === "returned_to_relaxation")
           .length,
+        issuedToCuttingWithoutTrolley: items.filter((r) =>
+        r.status?.trim().toLowerCase() === "issued_to_cutting" &&
+        !r.trolleyCode
+        
+      ),
       };
 
       return res.status(200).json({

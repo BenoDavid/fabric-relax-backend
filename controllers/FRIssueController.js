@@ -66,8 +66,35 @@ class FRIssueController extends BaseController {
             transaction,
           },
         );
+         if (payload.removeTrolley) {
+          await FRFabricRelax.update(
+          { trolleyCode: null },
+          {
+            where: { id: rollIds },
+            transaction,
+          },
+        );
+            await FRTrolleyRack.update(
+                {
+                  isOccupied: false,
+                },
+                {
+                  where: { trolleyCode: trolleyCode },
+                  transaction,
+                },
+              );
+            await FRTrolley.update(
+                {
+                  buyerName: null,
+                  where: { id: trolleyCode },
+                  transaction,  
+                },
+              );
+      }
       });
        
+     
+
       if (wss) {
         wss.broadcast({
           event: "MovedToCuttingRoll",
