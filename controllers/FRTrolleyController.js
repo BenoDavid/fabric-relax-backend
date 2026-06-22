@@ -3,7 +3,7 @@ const { where } = require('sequelize');
 const db = require('../models');
 const BaseController = require('./BaseController');
 const { FRTrolley, FRTrolleyRack } = db.sequelizeDb2.models;
-
+const { Sequelize } = require("sequelize");
 /**
  * Controller for handling Product Development, Compliance, and Bulk tracking.
  * Extends a BaseController for standard CRUD functionality.
@@ -63,20 +63,39 @@ class FRTrolleyController extends BaseController {
             [Sequelize.Op.between]: [startDate, endDate],
           };
         }
-        // Combine all options and fetch data
-        const items = await this.model.findAndCountAll({
-          where: filterOptions,
-          include: [
-              {
-                model: FRTrolleyRack,
-                attributes: ['rackNo', 'isOccupied'],  
-                as: 'racks'
-              }
-            ]
+      
+        const whereOptions = {};
 
-          // order: sortOptions,
-          // ...paginationOptions
+        if (filterOptions.currentLocation) {
+          if (typeof filterOptions.currentLocation === "string") {
+            const locations = filterOptions.currentLocation.includes(",")
+              ? filterOptions.currentLocation.split(",")
+              : [filterOptions.currentLocation];
+
+            whereOptions.currentLocation = {
+              [Sequelize.Op.in]: locations,
+            };
+          }
+
+        }
+
+        // ✅ merge all filters
+        const finalWhere = {
+          ...filterOptions,
+          ...whereOptions,
+        };
+
+        const items = await this.model.findAndCountAll({
+          where: finalWhere,
+          include: [
+            {
+              model: FRTrolleyRack,
+              attributes: ['rackNo', 'isOccupied'],
+              as: 'racks'
+            }
+          ],
         });
+
   
         // Respond with paginated data and metadata
         res.status(200).json({

@@ -22,7 +22,7 @@ class FRIssueController extends BaseController {
   }
 
   async createBatch(req, res) {
-    const { rollIds, issueTo, status, issuedOn, issuedBy, gdnNo, trolleyCode } = req.body;
+    const { rollIds, issueTo, status, issuedOn, issuedBy, gdnNo, trolleyCode, removeTrolley } = req.body;
 
     try {
       await db.sequelizeDb2.transaction(async (transaction) => {
@@ -66,30 +66,61 @@ class FRIssueController extends BaseController {
             transaction,
           },
         );
-         if (payload.removeTrolley) {
-          await FRFabricRelax.update(
-          { trolleyCode: null },
-          {
-            where: { id: rollIds },
+         if (removeTrolley) {
+          const allocations = await FRTrolleyAllocation.findAll({
+            where: { rollId: rollIds },
             transaction,
-          },
-        );
+          });
+
+          if (!allocations.length) {
+            throw new Error("No Rolls found");
+          }
+            await FRFabricRelax.update(
+            { trolleyCode: null },
+            {
+              where: { id: rollIds },
+              transaction,
+            },
+            );
             await FRTrolleyRack.update(
                 {
                   isOccupied: false,
                 },
                 {
-                  where: { trolleyCode: trolleyCode },
+                  where: {
+                [db.Sequelize.Op.or]: allocations.map((a) => ({
+                  trolleyId: a.trolleyId,
+                  rackNo: a.rackNo,
+                })),
+              },
                   transaction,
                 },
               );
-            await FRTrolley.update(
+          const trolleyIds = [...new Set(allocations.map((a) => a.trolleyId))];
+
+          for (const trolleyId of trolleyIds) {
+
+            const remaining = await FRTrolleyRack.count({
+              where: { trolleyId, isOccupied: true },
+              transaction,
+            });
+
+            if (remaining === 0) {
+              await FRTrolley.update(
                 {
                   buyerName: null,
-                  where: { id: trolleyCode },
-                  transaction,  
+                  location: null,
+                  status: "EMPTY",
+                  currentLocation: "relaxation",
+                },
+                {
+                  where: { id: trolleyId },
+                  transaction,
                 },
               );
+            }
+          }
+
       }
       });
        
@@ -250,6 +281,151 @@ class FRIssueController extends BaseController {
                 });
               }
           
+        } else if (type === "ROLL_APPROVE") {
+          await FRFabricRelax.update(
+            { status: "APPROVED", isActive: false },
+            { where: { id: rollIds }, transaction },
+          );
+
+          await FRIssue.update(
+            {
+              issueTo: cuttingTable,
+              status: "APPROVED",
+              approvedBy,
+              approvedOn: new Date(),
+            },
+            { where: { rollId: rollIds }, transaction },
+          );
+        } else if (type === "ROLL_RETURN") {
+          await FRFabricRelax.update(
+            { status: "returned_to_relaxation" },
+            { where: { id: rollIds }, transaction },
+          );
+
+          await FRIssue.update(
+            {
+              status: "RETURNED",
+              returnedOn: new Date(),
+              returnedBy,
+            },
+            { where: { rollId: rollIds }, transaction },
+          );          
+        }else if (type === "PARTIAL_APPROVE") {
+          const allocations = await FRTrolleyAllocation.findAll({
+            where: { rollId: rollIds },
+            transaction,
+          });
+          await FRFabricRelax.update(
+            { status: "APPROVED", isActive: false },
+            { where: { id: rollIds }, transaction },
+          );
+
+          await FRIssue.update(
+            {
+              issueTo: cuttingTable,
+              status: "APPROVED",
+              approvedBy,
+              approvedOn: new Date(),
+            },
+            { where: { rollId: rollIds }, transaction },
+          );
+              await FRTrolleyRack.update(
+            { isOccupied: false },
+            {
+              where: {
+                [db.Sequelize.Op.or]: allocations.map((a) => ({
+                  trolleyId: a.trolleyId,
+                  rackNo: a.rackNo,
+                })),
+              },
+              transaction,
+            },
+          );
+
+          const trolleyIds = [...new Set(allocations.map((a) => a.trolleyId))];
+
+          for (const trolleyId of trolleyIds) {
+            const remaining = await FRTrolleyRack.count({
+              where: { trolleyId, isOccupied: true },
+              transaction,
+            });
+
+            if (remaining === 0) {
+              await FRTrolley.update(
+                {
+                  buyerName: null,
+                  location: null,
+                  status: "EMPTY",
+                  currentLocation: "relaxation",
+                },
+                {
+                  where: { id: trolleyId },
+                  transaction,
+                },
+              );
+            }
+
+              if (wss) {
+                wss.broadcast({
+                  event: "CuttingApprovedRoll",
+                  data: {
+                    addRoll:rollIds.length
+                  },
+                });
+              }
+          }
+        } else if (type === "PARTIAL_RETURN") {
+          const allocations = await FRTrolleyAllocation.findAll({
+          where: { rollId: rollIds },
+          transaction,
+          });
+          await FRFabricRelax.update(
+            { status: "returned_to_relaxation",trolleyCode: null },
+            { where: { id: rollIds }, transaction },
+          );
+
+          await FRIssue.update(
+            {
+              status: "RETURNED",
+              returnedOn: new Date(),
+              returnedBy,
+            },
+            { where: { rollId: rollIds }, transaction },
+          );  
+                await FRTrolleyRack.update(
+                {
+                  isOccupied: false,
+                },
+                {
+                  where: {
+                [db.Sequelize.Op.or]: allocations.map((a) => ({
+                  trolleyId: a.trolleyId,
+                  rackNo: a.rackNo,
+                })),
+              },
+                  transaction,
+                },
+              );
+            const trolleyIds = [...new Set(allocations.map((a) => a.trolleyId))];
+
+          for (const trolleyId of trolleyIds) {
+            const remaining = await FRTrolleyRack.count({
+              where: { trolleyId, isOccupied: true },
+              transaction,
+            });
+
+            if (remaining === 0) {
+              await FRTrolley.update(
+                {
+                  currentLocation: "returned_to_relaxation",
+                },
+                {
+                  where: { id: trolleyId },
+                  transaction,
+                },
+              );
+            }
+          }        
         }
       });
 

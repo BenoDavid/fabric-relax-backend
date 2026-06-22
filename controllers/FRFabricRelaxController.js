@@ -212,6 +212,14 @@ class FRFabricRelaxController extends BaseController {
                 [Sequelize.Op.is]: null,
               };
             }
+          }else if (filterOptions.status === "returned_to_relaxation") {
+             if (filterOptions.trolleyCode) {
+              whereOptions.trolleyCode = filterOptions.trolleyCode;
+            } else {
+              whereOptions.trolleyCode = {
+                [Sequelize.Op.is]: null,
+              };
+            }
           }
           else{
             whereOptions.status = filterOptions.status;
