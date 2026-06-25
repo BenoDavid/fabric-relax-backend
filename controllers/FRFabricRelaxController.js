@@ -147,6 +147,9 @@ class FRFabricRelaxController extends BaseController {
           [Sequelize.Op.between]: [startDate, endDate],
         };
       }
+      if(rollId) {
+        filterOptions.rollId = rollId;
+      }
       const fabricWhere = {};
       if (filterOptions.shadeLot) fabricWhere.shadeLot = filterOptions.shadeLot;
       if (filterOptions.ocNo) fabricWhere.ocNo = filterOptions.ocNo;
@@ -212,11 +215,25 @@ class FRFabricRelaxController extends BaseController {
                 [Sequelize.Op.is]: null,
               };
             }
-          }else if (filterOptions.status === "returned_to_relaxation") {
+              if (filterOptions.rollId) {
+              whereOptions.rollId = filterOptions.rollId;
+            } else {
+              whereOptions.rollId = {
+                [Sequelize.Op.is]: null,
+              };
+            }
+          }else if (filterOptions.status === "returned_to_relaxation") { 
              if (filterOptions.trolleyCode) {
               whereOptions.trolleyCode = filterOptions.trolleyCode;
             } else {
               whereOptions.trolleyCode = {
+                [Sequelize.Op.is]: null,
+              };
+            }
+            if (filterOptions.rollId) {
+              whereOptions.rollId = filterOptions.rollId;
+            } else {
+              whereOptions.rollId = {
                 [Sequelize.Op.is]: null,
               };
             }
