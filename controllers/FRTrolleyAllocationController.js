@@ -60,11 +60,9 @@ class FRTrolleyAllocationController extends BaseController {
           if (rack.isOccupied) throw new Error("Rack already occupied");
 
           if (!trolley.buyerName) {
-            trolley.buyerName = roll.buyerName;
+            trolley.buyerName = roll.buyerName === 'ADS' ? 'CF2' : roll.buyerName;
             await trolley.save({ transaction });
-          } else if (trolley.buyerName !== roll.buyerName) {
-            throw new Error("Buyer mismatch – trolley locked");
-          }
+          } 
 
           // ✅ REMOVE FROM OLD TROLLEY (Trolley → Trolley move)
           const existingTrolley = await FRTrolleyAllocation.findOne({

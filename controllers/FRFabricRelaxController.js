@@ -147,6 +147,8 @@ class FRFabricRelaxController extends BaseController {
           [Sequelize.Op.between]: [startDate, endDate],
         };
       }
+
+      const rollId = req.rollId;
       if(rollId) {
         filterOptions.rollId = rollId;
       }
