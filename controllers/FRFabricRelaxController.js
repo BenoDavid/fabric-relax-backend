@@ -217,13 +217,14 @@ class FRFabricRelaxController extends BaseController {
                 [Sequelize.Op.is]: null,
               };
             }
-              if (filterOptions.rollId) {
+            if (filterOptions.rollId) {
               whereOptions.rollId = filterOptions.rollId;
-            } else {
-              whereOptions.rollId = {
-                [Sequelize.Op.is]: null,
-              };
-            }
+            } 
+            // else {
+            //   whereOptions.rollId = {
+            //     [Sequelize.Op.is]: null,
+            //   };
+            // }
           }else if (filterOptions.status === "returned_to_relaxation") { 
              if (filterOptions.trolleyCode) {
               whereOptions.trolleyCode = filterOptions.trolleyCode;
@@ -234,11 +235,12 @@ class FRFabricRelaxController extends BaseController {
             }
             if (filterOptions.rollId) {
               whereOptions.rollId = filterOptions.rollId;
-            } else {
-              whereOptions.rollId = {
-                [Sequelize.Op.is]: null,
-              };
-            }
+            } 
+            // else {
+            //   whereOptions.rollId = {
+            //     [Sequelize.Op.is]: null,
+            //   };
+            // }
           }
           else{
             whereOptions.status = filterOptions.status;
@@ -254,6 +256,7 @@ class FRFabricRelaxController extends BaseController {
       // }
       const items = await this.model.findAndCountAll({
         where: whereOptions,
+        distinct: true,
         include: [
           {
             model: this.model.associations.fabric.target,
