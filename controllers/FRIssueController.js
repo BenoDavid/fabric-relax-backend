@@ -2,7 +2,6 @@
 const db = require("../models");
 const BaseController = require("./BaseController");
 const { getWss } = require("../ws");
-const wss = getWss();
 const {
   FRIssue,
   FRFabricRelax,
@@ -126,13 +125,15 @@ class FRIssueController extends BaseController {
        
      
 
+      const wss = getWss();
       if (wss) {
         wss.broadcast({
           event: "MovedToCuttingRoll",
           data: {
-            addRoll:rolls.length
+            addRoll: rollIds.length,
           },
         });
+        wss.broadcastDashboardCounts();
       }
       return res.json({
         success: true,
@@ -219,14 +220,6 @@ class FRIssueController extends BaseController {
               );
             }
 
-              if (wss) {
-                wss.broadcast({
-                  event: "CuttingApprovedRoll",
-                  data: {
-                    addRoll:rollIds.length
-                  },
-                });
-              }
           }
         } else if (type === "RETURN") {
           const allocations = await FRTrolleyAllocation.findAll({
@@ -272,15 +265,6 @@ class FRIssueController extends BaseController {
               );
             }
           }
-            if (wss) {
-                wss.broadcast({
-                  event: "CuttingRejectedRoll",
-                  data: {
-                    addRoll:rollIds.length
-                  },
-                });
-              }
-          
         } else if (type === "ROLL_APPROVE") {
           await FRFabricRelax.update(
             { status: "APPROVED", isActive: false },
@@ -365,14 +349,6 @@ class FRIssueController extends BaseController {
               );
             }
 
-              if (wss) {
-                wss.broadcast({
-                  event: "CuttingApprovedRoll",
-                  data: {
-                    addRoll:rollIds.length
-                  },
-                });
-              }
           }
         } else if (type === "PARTIAL_RETURN") {
           const allocations = await FRTrolleyAllocation.findAll({
@@ -428,6 +404,22 @@ class FRIssueController extends BaseController {
           }        
         }
       });
+
+      const wss = getWss();
+      if (wss) {
+        if (type === "APPROVE" || type === "PARTIAL_APPROVE") {
+          wss.broadcast({
+            event: "CuttingApprovedRoll",
+            data: { addRoll: rollIds.length },
+          });
+        } else if (type === "RETURN" || type === "PARTIAL_RETURN") {
+          wss.broadcast({
+            event: "CuttingRejectedRoll",
+            data: { addRoll: rollIds.length },
+          });
+        }
+        wss.broadcastDashboardCounts();
+      }
 
       return res.json({
         success: true,

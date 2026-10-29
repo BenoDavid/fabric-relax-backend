@@ -3,6 +3,7 @@
 
 const db = require("../models");
 const BaseController = require("./BaseController");
+const { getWss } = require("../ws");
 
 const {
   FRTrolley,
@@ -194,6 +195,11 @@ class FRTrolleyAllocationController extends BaseController {
         }
 
       });
+
+      const wss = getWss();
+      if (wss) {
+        wss.broadcastDashboardCounts();
+      }
 
       res.status(200).json({
         status: 200,

@@ -5,6 +5,7 @@ const BaseController = require("./BaseController");
 const { FRFabricRelax, WMSFabricCollection, FRTrolleyAllocation, FRTrolleyRack, FRTrolley } = db.sequelizeDb2.models;
 const { Sequelize } = require("sequelize");
 const { getWss } = require("../ws");
+const { getDashboardSnapshot } = require("../services/frDashboardService");
 /**
  * Controller for handling Product Development, Compliance, and Bulk tracking.
  * Extends a BaseController for standard CRUD functionality.
@@ -67,6 +68,7 @@ class FRFabricRelaxController extends BaseController {
             addRoll: 1,
           },
         });
+        wss.broadcastDashboardCounts();
       }
 
       res.status(200).json({
@@ -314,57 +316,7 @@ class FRFabricRelaxController extends BaseController {
     try {
       const filters = req.body || {};
 
-      const items = await this.model.findAll({
-        where: filters,
-      });
-
-      const now = new Date().getTime();
-
-      // ✅ Helper function
-      const isCompleted = (row) => {
-        if (!row.machineEnd || !row.relaxingHours) return false;
-
-        const totalTime =
-          new Date(row.machineEnd).getTime() +
-          row.relaxingHours * 60 * 60 * 1000;
-
-        return totalTime <= now;
-      };
-
-      // ✅ ✅ COUNTS
-      const counts = {
-        loadRoll: items.filter((r) => r.machineEnd == null).length,
-
-        loadedRoll: items.filter(
-          (r) => r.machineEnd != null && r.status === "relaxation_started",
-        ).length,
-
-        trolleyAllocated: items.filter(
-          (r) =>
-            r.machineEnd != null &&
-            (r.status === "trolley_allocated" ||
-              r.status === "returned_to_relaxation"),
-        ).length,
-
-        relaxationCompleted: items.filter((r) => isCompleted(r)).length,
-
-        overRelaxed: items.filter(
-          (r) => isCompleted(r) && r.status === "trolley_allocated",
-        ).length,
-
-        issuedToCutting: items.filter((r) => r.status === "issued_to_cutting")
-          .length,
-
-        approved: items.filter((r) => r.status === "APPROVED").length,
-
-        returned: items.filter((r) => r.status === "returned_to_relaxation")
-          .length,
-        issuedToCuttingWithoutTrolley: items.filter((r) =>
-        r.status?.trim().toLowerCase() === "issued_to_cutting" &&
-        !r.trolleyCode
-        
-      ),
-      };
+      const { counts } = await getDashboardSnapshot(filters);
 
       return res.status(200).json({
         status: 200,
@@ -399,6 +351,7 @@ class FRFabricRelaxController extends BaseController {
               addRoll: 1,
             },
           });
+          wss.broadcastDashboardCounts();
         }
       }
     } catch (error) {
@@ -515,17 +468,6 @@ async updateBatch(req, res) {
         }
       }
 
-      // ✅ 7. WebSocket broadcast
-      const wss = getWss();
-      if (wss) {
-        wss.broadcast({
-          event: "CuttingRejectedRoll",
-          data: {
-            addRoll: ids.length,
-          },
-        });
-      }
-
       // ✅ 8. Response
       return res.status(200).json({
         status: 200,
@@ -534,6 +476,15 @@ async updateBatch(req, res) {
       });
 
     });
+
+    const wss = getWss();
+    if (wss) {
+      wss.broadcast({
+        event: "CuttingRejectedRoll",
+        data: { addRoll: ids.length },
+      });
+      wss.broadcastDashboardCounts();
+    }
 
   } catch (error) {
 

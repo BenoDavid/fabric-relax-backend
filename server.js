@@ -2,12 +2,12 @@ const http = require("http");
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
-const { initWebSocket } = require("./ws");
 
 const env = process.env.NODE_ENV || "development";
 dotenv.config({ path: `.env.${env}` });
 console.log(`Running in ${env} mode`);
 
+const { initWebSocket } = require("./ws");
 const routes = require("./routes");
 const config = require("./config");
 const authMiddleware = require("./middleware/authMiddleware");
@@ -39,6 +39,5 @@ const PORT = config.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
 
 
